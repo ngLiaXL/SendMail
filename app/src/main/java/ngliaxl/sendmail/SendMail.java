@@ -27,16 +27,15 @@ import java.net.Socket;
  */
 public class SendMail {
 
+   
     private static final String L = "\r\n";
     private static final String EHLO = "EHLO pop.exmail.qq.com" + L;
     private static final String AUTH = "AUTH LOGIN" + L;
-    private static final String DEFAULT_USER_NAME = "username";
-    private static final String DEFAULT_PASSWORD = "password";
 
     private String mHost;
     private int mPort;
-    private String mAddresser = "send";
-    private String mAddressee = "<xxx.com>;";
+    private String mSender;
+    private String mReceivers;
     private String mSubject;
     private String mContent;
 
@@ -70,16 +69,23 @@ public class SendMail {
             throw new RuntimeException("You must set host and port by calling withHost/withPort " +
                     "method");
         }
-        if (mAddresser == null || mAddressee == null) {
+        if (mSender == null || mReceivers == null) {
             throw new RuntimeException("You must set addresser and addressee by calling " +
-                    "withAddresser/withAddressee " +
+                    "withSender/withReceivers " +
                     "method");
         }
+
+        if (mUserName == null || mPassword == null) {
+            throw new RuntimeException("You must set sender user name and password by calling " +
+                    "withUserName/withPassword " +
+                    "method");
+        }
+
         initSocket(mHost, mPort);
 
         int loop = 0;
         int index = 0;
-        String[] addressees = mAddressee.split(";");
+        String[] addressees = mReceivers.split(";");
         while (true) {
             if (!mSocket.isConnected()) {
                 sleep(3000);
@@ -101,7 +107,7 @@ public class SendMail {
             } else if (loop == (6 + addressees.length - 1) && cmd.contains("250")) {
                 writeBytes(getMailData());
             } else if (loop == (7 + addressees.length - 1) && cmd.contains("354")) {
-                write(getContent());
+                write(EncodingUtils.getBytes(getContent(), "GBK"));
             } else if (loop == (8 + addressees.length - 1) && cmd.contains("250")) {
                 writeBytes("QUIT\r\n");
                 break;
@@ -132,13 +138,13 @@ public class SendMail {
         return this;
     }
 
-    public SendMail withAddresser(String addresser) {
-        this.mAddresser = addresser;
+    public SendMail withSender(String sender) {
+        this.mSender = sender;
         return this;
     }
 
-    public SendMail withAddressee(String mAddressee) {
-        this.mAddressee = mAddressee;
+    public SendMail withReceivers(String receivers) {
+        this.mReceivers = receivers;
         return this;
     }
 
@@ -157,18 +163,23 @@ public class SendMail {
         return this;
     }
 
+    public SendMail withUserName(String name) {
+        this.mUserName = name;
+        return this;
+    }
+
+    public SendMail withPassword(String password) {
+        this.mPassword = password;
+        return this;
+    }
+
+
     private String getUserName() {
-        if (mUserName == null) {
-            mUserName = DEFAULT_USER_NAME;
-        }
         byte[] buffer = mUserName.getBytes();
         return Base64.encodeToString(buffer, Base64.NO_WRAP) + L;
     }
 
     private String getPassword() {
-        if (mPassword == null) {
-            mPassword = DEFAULT_PASSWORD;
-        }
         byte[] buffer = mPassword.getBytes();
         return Base64.encodeToString(buffer, Base64.NO_WRAP) + L;
     }
@@ -176,7 +187,7 @@ public class SendMail {
     private String getMailFrom() {
         return new StringBuffer()
                 .append("MAIL FROM:<")
-                .append(mAddresser).append(">").append(L).toString();
+                .append(mSender).append(">").append(L).toString();
     }
 
     private String getMailTo(int index, String[] addressees) {
@@ -189,10 +200,10 @@ public class SendMail {
     }
 
 
-    private byte[] getContent() {
+    private String getContent() {
         StringBuffer mailbody = new StringBuffer();
         mailbody.append("From:<");
-        mailbody.append(mAddresser);
+        mailbody.append(mSender);
         mailbody.append(">");
         mailbody.append("\r\n");
 
@@ -200,7 +211,7 @@ public class SendMail {
         mailbody.append("Subject:").append(mSubject);
         mailbody.append(L);
         mailbody.append("To:");
-        mailbody.append(mAddressee);
+        mailbody.append(mReceivers);
         mailbody.append(L);
 
         mailbody.append(L);
@@ -211,12 +222,7 @@ public class SendMail {
         mailbody.append(L);
         mailbody.append(".");
         mailbody.append(L);
-        try {
-            return mailbody.toString().getBytes("GBK");
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return null;
+        return mailbody.toString();
     }
 
 
@@ -280,6 +286,19 @@ public class SendMail {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public static void main(String[] args){
+        SendMail sender = new SendMail() ;
+        sender.withHost("smtp1.eascs.com") ;
+        sender.withPort(25) ;
+        sender.withUserName("xianglong.liang@eascs.com") ;
+        sender.withPassword("123456") ;
+        sender.withSender("xianglong.liang@eascs.com") ;
+        sender.withReceivers("<xianglong.liang@eascs.com>;<chengbao.liu@eascs.com>") ;
+        sender.withSubject("subject") ;
+        sender.withContent("content") ;
+        sender.sendAsync();
     }
 
 }
